@@ -1,39 +1,39 @@
 package main
 
 import (
-    "testing"
+	"testing"
 
-    "github.com/ethereum/go-ethereum/crypto"
-    "github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 )
 
 func TestServerIdentifyNodeID(t *testing.T) {
-    server := NewServer()
+	server := NewServer()
 
-    challenge := server.generateChallenge()
+	challenge := server.generateChallenge()
 
-    key, err := crypto.GenerateKey()
-    if err != nil {
-        t.Errorf("failed: %v", err)
-    }
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Errorf("failed: %v", err)
+	}
 
-    hash := crypto.Keccak256Hash(challenge)
+	hash := crypto.Keccak256Hash(challenge)
 
-    // sign challenge with key
-    sig, err := crypto.Sign(hash[:], key)
-    if err != nil {
-        t.Errorf("failed: %v", err)
-    }
+	// sign challenge with key
+	sig, err := crypto.Sign(hash[:], key)
+	if err != nil {
+		t.Errorf("failed: %v", err)
+	}
 
-    nodeID := discv5.PubkeyID(&key.PublicKey)
-    resp := ChallengeResponse {
-        NodeID: nodeID,
-        Hash: hash,
-        Signature: sig,
-    }
+	nodeID := discv5.PubkeyID(&key.PublicKey)
+	resp := ChallengeResponse{
+		NodeID:    nodeID,
+		Hash:      hash,
+		Signature: sig,
+	}
 
-    err = server.verifyNode(challenge, resp)
-    if err != nil {
-        t.Errorf("failed: %v", err)
-    }
+	err = server.verifyNode(challenge, resp)
+	if err != nil {
+		t.Errorf("failed: %v", err)
+	}
 }

@@ -1,18 +1,18 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"sync"
-    "encoding/json"
-    "io"
-    "crypto/rand"
-    "fmt"
-    "net/http"
 
-
-    "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/gorilla/websocket"
-    "github.com/ethereum/go-ethereum/p2p/discv5"
 )
+
 type Signal struct {
 	NodeID discv5.NodeID
 	Msg    []byte
@@ -25,7 +25,7 @@ type ChallengeResponse struct {
 }
 
 type Server struct {
-	nodeChannels     sync.Map
+	nodeChannels sync.Map
 
 	upgrader websocket.Upgrader
 }
@@ -58,11 +58,11 @@ func (s *Server) ReadLoop(nc *NodeConn) error {
 			return err
 		}
 
-        signal := Signal{}
-        err = json.Unmarshal(msg, &signal)
-        if err != nil {
-            return err
-        }
+		signal := Signal{}
+		err = json.Unmarshal(msg, &signal)
+		if err != nil {
+			return err
+		}
 
 		err = s.notifyNode(signal.NodeID, msg)
 		if err != nil {
@@ -72,9 +72,9 @@ func (s *Server) ReadLoop(nc *NodeConn) error {
 }
 
 func (s *Server) notifyNode(nodeID discv5.NodeID, msg []byte) error {
-    if nc, ok := s.nodeChannels.Load(nodeID); ok {
-        (nc.(NodeConn)).writeChan <- &Signal{Msg: msg}
-    }
+	if nc, ok := s.nodeChannels.Load(nodeID); ok {
+		(nc.(NodeConn)).writeChan <- &Signal{Msg: msg}
+	}
 	return nil
 }
 
@@ -89,7 +89,7 @@ func (s *Server) generateChallenge() []byte {
 	challenge := make([]byte, 256)
 	io.ReadFull(rand.Reader, challenge)
 
-    return challenge
+	return challenge
 }
 
 func (s *Server) verifyNode(challenge []byte, resp ChallengeResponse) error {
@@ -97,18 +97,18 @@ func (s *Server) verifyNode(challenge []byte, resp ChallengeResponse) error {
 		return fmt.Errorf("hash incorrect from node %s", resp.NodeID)
 	}
 
-    publicKey, err := resp.NodeID.Pubkey()
-    if err != nil {
-        return err
-    }
+	publicKey, err := resp.NodeID.Pubkey()
+	if err != nil {
+		return err
+	}
 
 	// check signature match nodeID(public key)
-    verified := crypto.VerifySignature(crypto.FromECDSAPub(publicKey), resp.Hash[:], resp.Signature[:64])
+	verified := crypto.VerifySignature(crypto.FromECDSAPub(publicKey), resp.Hash[:], resp.Signature[:64])
 	if !verified {
 		return fmt.Errorf("unable to verify signature from node %s", resp.NodeID)
 	}
 
-    return nil
+	return nil
 }
 
 func (s *Server) identifyNodeID(conn *Conn) (discv5.NodeID, error) {
@@ -132,10 +132,10 @@ func (s *Server) identifyNodeID(conn *Conn) (discv5.NodeID, error) {
 		return discv5.NodeID{}, err
 	}
 
-    err = s.verifyNode(challenge, resp)
-    if err != nil {
-        return discv5.NodeID{}, err
-    }
+	err = s.verifyNode(challenge, resp)
+	if err != nil {
+		return discv5.NodeID{}, err
+	}
 
 	return resp.NodeID, nil
 }
@@ -187,4 +187,3 @@ func (s *Server) SignalHandler(w http.ResponseWriter, r *http.Request) {
 	// websocket read loop
 	s.ReadLoop(&nodeConn)
 }
-

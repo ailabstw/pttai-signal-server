@@ -1,10 +1,10 @@
 package main
 
 import (
-    "sync/atomic"
+	"sync/atomic"
 
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/gorilla/websocket"
-    "github.com/ethereum/go-ethereum/p2p/discv5"
 )
 
 type Conn struct {
@@ -38,4 +38,3 @@ func NewNodeConn(nodeID discv5.NodeID, conn *Conn) NodeConn {
 
 	return nc
 }
-
