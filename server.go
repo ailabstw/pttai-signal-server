@@ -18,7 +18,8 @@ type signal struct {
 }
 
 type challengeResponse struct {
-	NodeID    discv5.NodeID
+	NodeID discv5.NodeID
+
 	Signature []byte
 	Hash      [32]byte
 }
@@ -40,8 +41,7 @@ looping:
 				break looping
 			}
 
-			// currently we need to send the already-jsoned-msg directly to the target.
-			err := nc.Conn.WsConn.WriteMessage(websocket.TextMessage, signal.Msg)
+			err := nc.Conn.WsConn.WriteJSON(signal)
 			if err != nil {
 				return err
 			}
@@ -55,13 +55,13 @@ looping:
 
 func (s *Server) readLoop(nc *NodeConn) error {
 	for {
-		signal := signal{}
-		err := nc.Conn.WsConn.ReadJSON(&signal)
+		signal := &signal{}
+		err := nc.Conn.WsConn.ReadJSON(signal)
 		if err != nil {
 			return err
 		}
 
-		err = s.dispatch(&signal)
+		err = s.dispatch(signal)
 		if err != nil {
 			return err
 		}
@@ -89,7 +89,7 @@ func (s *Server) generateChallenge() []byte {
 	return challenge
 }
 
-func (s *Server) verifyNode(challenge []byte, resp challengeResponse) error {
+func (s *Server) verifyNode(challenge []byte, resp *challengeResponse) error {
 	if resp.Hash != crypto.Keccak256Hash(challenge) {
 		return fmt.Errorf("hash incorrect from node %s", resp.NodeID)
 	}
@@ -111,13 +111,16 @@ func (s *Server) verifyNode(challenge []byte, resp challengeResponse) error {
 func (s *Server) identifyNodeID(conn *Conn) (discv5.NodeID, error) {
 	challenge := s.generateChallenge()
 
+	signal := &signal{Msg: challenge}
+
 	// send challenge to conn
-	err := conn.WsConn.WriteJSON(challenge)
+	err := conn.WsConn.WriteJSON(signal)
+	// log.Printf("server.identifyNodeID: after WriteJSON signal: %v, e: %v", signal, err)
 	if err != nil {
 		return discv5.NodeID{}, err
 	}
 
-	resp := challengeResponse{}
+	resp := &challengeResponse{}
 	err = conn.WsConn.ReadJSON(resp)
 	if err != nil {
 		return discv5.NodeID{}, err
@@ -133,8 +136,6 @@ func (s *Server) identifyNodeID(conn *Conn) (discv5.NodeID, error) {
 
 func (s *Server) newNodeConn(nodeID discv5.NodeID, wsConn *Conn) (*NodeConn, error) {
 	// check already exists
-	// TODO: close old read loop if node channel already exists
-
 	s.nodeChannelsWriteLock.Lock()
 	defer s.nodeChannelsWriteLock.Unlock()
 
@@ -174,6 +175,9 @@ func (s *Server) SignalHandler(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		s.removeFromNodeChannels(nodeConn)
 	}()
+
+	signal := &signal{NodeID: nodeID}
+	nodeConn.Conn.WsConn.WriteJSON(signal)
 
 	// write loop
 	go s.writeLoop(nodeConn)
