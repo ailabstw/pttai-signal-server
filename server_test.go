@@ -26,7 +26,7 @@ func TestServerIdentifyNodeID(t *testing.T) {
 	}
 
 	nodeID := discv5.PubkeyID(&key.PublicKey)
-	resp := ChallengeResponse{
+	resp := challengeResponse{
 		NodeID:    nodeID,
 		Hash:      hash,
 		Signature: sig,

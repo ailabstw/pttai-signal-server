@@ -13,12 +13,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type Signal struct {
+type signal struct {
 	NodeID discv5.NodeID
 	Msg    []byte
 }
 
-type ChallengeResponse struct {
+type challengeResponse struct {
 	NodeID    discv5.NodeID
 	Signature []byte
 	Hash      [32]byte
@@ -30,7 +30,7 @@ type Server struct {
 	upgrader websocket.Upgrader
 }
 
-func (s *Server) WriteLoop(nc *NodeConn) error {
+func (s *Server) writeLoop(nc *NodeConn) error {
 looping:
 	for {
 		select {
@@ -38,7 +38,7 @@ looping:
 			if !ok {
 				break looping
 			}
-			// write
+
 			err := nc.Conn.WsConn.WriteMessage(websocket.TextMessage, signal.Msg)
 			if err != nil {
 				return err
@@ -51,14 +51,14 @@ looping:
 	return nil
 }
 
-func (s *Server) ReadLoop(nc *NodeConn) error {
+func (s *Server) readLoop(nc *NodeConn) error {
 	for {
 		_, msg, err := nc.Conn.WsConn.ReadMessage()
 		if err != nil {
 			return err
 		}
 
-		signal := Signal{}
+		signal := signal{}
 		err = json.Unmarshal(msg, &signal)
 		if err != nil {
 			return err
@@ -73,7 +73,7 @@ func (s *Server) ReadLoop(nc *NodeConn) error {
 
 func (s *Server) notifyNode(nodeID discv5.NodeID, msg []byte) error {
 	if nc, ok := s.nodeChannels.Load(nodeID); ok {
-		(nc.(NodeConn)).writeChan <- &Signal{Msg: msg}
+		(nc.(NodeConn)).writeChan <- &signal{Msg: msg}
 	}
 	return nil
 }
@@ -92,7 +92,7 @@ func (s *Server) generateChallenge() []byte {
 	return challenge
 }
 
-func (s *Server) verifyNode(challenge []byte, resp ChallengeResponse) error {
+func (s *Server) verifyNode(challenge []byte, resp challengeResponse) error {
 	if resp.Hash != crypto.Keccak256Hash(challenge) {
 		return fmt.Errorf("hash incorrect from node %s", resp.NodeID)
 	}
@@ -126,7 +126,7 @@ func (s *Server) identifyNodeID(conn *Conn) (discv5.NodeID, error) {
 	}
 
 	// retrieve public key and signature from msg
-	resp := ChallengeResponse{}
+	resp := challengeResponse{}
 	err = json.Unmarshal(msg, &resp)
 	if err != nil {
 		return discv5.NodeID{}, err
@@ -140,7 +140,7 @@ func (s *Server) identifyNodeID(conn *Conn) (discv5.NodeID, error) {
 	return resp.NodeID, nil
 }
 
-func (s *Server) NewNodeConn(nodeID discv5.NodeID, wsConn *Conn) (NodeConn, error) {
+func (s *Server) newNodeConn(nodeID discv5.NodeID, wsConn *Conn) (NodeConn, error) {
 	// check already exists
 	// TODO: close old read loop if node channel already exists
 	if origConn, exists := s.nodeChannels.Load(nodeID); exists {
@@ -160,7 +160,7 @@ func (s *Server) SignalHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	conn := Conn{WsConn: wsConn}
+	conn := Conn{0, wsConn}
 	defer func() {
 		conn.Close()
 	}()
@@ -172,7 +172,7 @@ func (s *Server) SignalHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// create a NodeConn, which will create a read loop goroutine for the websocket connection
-	nodeConn, err := s.NewNodeConn(nodeID, &conn)
+	nodeConn, err := s.newNodeConn(nodeID, &conn)
 	if err != nil {
 		return
 	}
@@ -182,8 +182,8 @@ func (s *Server) SignalHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	// write loop
-	go s.WriteLoop(&nodeConn)
+	go s.writeLoop(&nodeConn)
 
 	// websocket read loop
-	s.ReadLoop(&nodeConn)
+	s.readLoop(&nodeConn)
 }
