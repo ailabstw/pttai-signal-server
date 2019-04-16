@@ -1,0 +1,13 @@
+language: go
+go_import_path: github.com/ailabstw/pttai-signal-server
+sudo: false
+matrix:
+  include:
+    # This builder only does unit-test on latest version of Go
+    - os: linux
+      dist: xenial
+      go: 1.12.x
+      env:
+        - test
+      script:
+        - go test
