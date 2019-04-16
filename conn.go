@@ -30,11 +30,11 @@ type NodeConn struct {
 	quitChan  chan struct{}
 }
 
-func NewNodeConn(nodeID discv5.NodeID, conn *Conn) NodeConn {
+func NewNodeConn(nodeID discv5.NodeID, conn *Conn) *NodeConn {
 	w := make(chan *signal)
 	q := make(chan struct{})
 
-	nc := NodeConn{writeChan: w, quitChan: q, Conn: conn}
+	nc := &NodeConn{writeChan: w, quitChan: q, Conn: conn}
 
 	return nc
 }

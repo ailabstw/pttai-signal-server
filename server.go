@@ -26,6 +26,8 @@ type challengeResponse struct {
 type Server struct {
 	nodeChannels sync.Map
 
+	nodeChannelsWriteLock sync.Mutex
+
 	upgrader websocket.Upgrader
 }
 
@@ -68,13 +70,13 @@ func (s *Server) readLoop(nc *NodeConn) error {
 
 func (s *Server) dispatch(signal *signal) error {
 	if nc, ok := s.nodeChannels.Load(signal.NodeID); ok {
-		(nc.(NodeConn)).writeChan <- signal
+		(nc.(*NodeConn)).writeChan <- signal
 	}
 	return nil
 }
 
-func NewServer() Server {
-	return Server{
+func NewServer() *Server {
+	return &Server{
 		nodeChannels: sync.Map{},
 		upgrader:     websocket.Upgrader{},
 	}
@@ -129,11 +131,15 @@ func (s *Server) identifyNodeID(conn *Conn) (discv5.NodeID, error) {
 	return resp.NodeID, nil
 }
 
-func (s *Server) newNodeConn(nodeID discv5.NodeID, wsConn *Conn) (NodeConn, error) {
+func (s *Server) newNodeConn(nodeID discv5.NodeID, wsConn *Conn) (*NodeConn, error) {
 	// check already exists
 	// TODO: close old read loop if node channel already exists
+
+	s.nodeChannelsWriteLock.Lock()
+	defer s.nodeChannelsWriteLock.Unlock()
+
 	if origConn, exists := s.nodeChannels.Load(nodeID); exists {
-		(origConn.(NodeConn)).Conn.Close()
+		(origConn.(*NodeConn)).Conn.Close()
 	}
 
 	nc := NewNodeConn(nodeID, wsConn)
@@ -165,14 +171,25 @@ func (s *Server) SignalHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	// XXX
 	defer func() {
-		// s.removeFromChanMap(nodeID, c, quitChan)
+		s.removeFromNodeChannels(nodeConn)
 	}()
 
 	// write loop
-	go s.writeLoop(&nodeConn)
+	go s.writeLoop(nodeConn)
 
 	// websocket read loop
-	s.readLoop(&nodeConn)
+	s.readLoop(nodeConn)
+}
+
+func (s *Server) removeFromNodeChannels(nodeConn *NodeConn) {
+
+	close(nodeConn.quitChan)
+
+	s.nodeChannelsWriteLock.Lock()
+	defer s.nodeChannelsWriteLock.Unlock()
+
+	if origConn, exists := s.nodeChannels.Load(nodeConn.NodeID); exists && origConn.(*NodeConn) == nodeConn {
+		s.nodeChannels.Delete(nodeConn.NodeID)
+	}
 }
