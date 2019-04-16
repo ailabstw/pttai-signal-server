@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -39,6 +38,7 @@ looping:
 				break looping
 			}
 
+			// currently we need to send the already-jsoned-msg directly to the target.
 			err := nc.Conn.WsConn.WriteMessage(websocket.TextMessage, signal.Msg)
 			if err != nil {
 				return err
@@ -53,27 +53,22 @@ looping:
 
 func (s *Server) readLoop(nc *NodeConn) error {
 	for {
-		_, msg, err := nc.Conn.WsConn.ReadMessage()
-		if err != nil {
-			return err
-		}
-
 		signal := signal{}
-		err = json.Unmarshal(msg, &signal)
+		err := nc.Conn.WsConn.ReadJSON(&signal)
 		if err != nil {
 			return err
 		}
 
-		err = s.notifyNode(signal.NodeID, msg)
+		err = s.notifyNode(&signal)
 		if err != nil {
 			return err
 		}
 	}
 }
 
-func (s *Server) notifyNode(nodeID discv5.NodeID, msg []byte) error {
-	if nc, ok := s.nodeChannels.Load(nodeID); ok {
-		(nc.(NodeConn)).writeChan <- &signal{Msg: msg}
+func (s *Server) notifyNode(signal *signal) error {
+	if nc, ok := s.nodeChannels.Load(signal.NodeID); ok {
+		(nc.(NodeConn)).writeChan <- signal
 	}
 	return nil
 }
@@ -115,19 +110,13 @@ func (s *Server) identifyNodeID(conn *Conn) (discv5.NodeID, error) {
 	challenge := s.generateChallenge()
 
 	// send challenge to conn
-	err := conn.WsConn.WriteMessage(websocket.TextMessage, challenge)
+	err := conn.WsConn.WriteJSON(challenge)
 	if err != nil {
 		return discv5.NodeID{}, err
 	}
 
-	_, msg, err := conn.WsConn.ReadMessage()
-	if err != nil {
-		return discv5.NodeID{}, err
-	}
-
-	// retrieve public key and signature from msg
 	resp := challengeResponse{}
-	err = json.Unmarshal(msg, &resp)
+	err = conn.WsConn.ReadJSON(resp)
 	if err != nil {
 		return discv5.NodeID{}, err
 	}
