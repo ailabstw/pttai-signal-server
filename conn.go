@@ -34,7 +34,14 @@ func NewNodeConn(nodeID discv5.NodeID, conn *Conn) *NodeConn {
 	w := make(chan *signal)
 	q := make(chan struct{})
 
-	nc := &NodeConn{writeChan: w, quitChan: q, Conn: conn}
+	nc := &NodeConn{
+		NodeID: nodeID,
+
+		Conn: conn,
+
+		writeChan: w,
+		quitChan:  q,
+	}
 
 	return nc
 }
