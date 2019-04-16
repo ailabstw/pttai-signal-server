@@ -59,14 +59,14 @@ func (s *Server) readLoop(nc *NodeConn) error {
 			return err
 		}
 
-		err = s.notifyNode(&signal)
+		err = s.dispatch(&signal)
 		if err != nil {
 			return err
 		}
 	}
 }
 
-func (s *Server) notifyNode(signal *signal) error {
+func (s *Server) dispatch(signal *signal) error {
 	if nc, ok := s.nodeChannels.Load(signal.NodeID); ok {
 		(nc.(NodeConn)).writeChan <- signal
 	}
