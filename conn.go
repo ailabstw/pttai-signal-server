@@ -1,4 +1,4 @@
-package main
+package signalserver
 
 import (
 	"sync/atomic"

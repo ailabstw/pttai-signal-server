@@ -1,11 +1,11 @@
-package main
+package signalserver
 
 import (
 	"crypto/ecdsa"
-	"log"
 	"net/url"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/gorilla/websocket"
 )
@@ -52,37 +52,37 @@ NewClient init a new client and pass the challenge from the signal-server.
 func NewClient(nodeID discv5.NodeID, privKey *ecdsa.PrivateKey, url url.URL) (*Client, error) {
 	wsConn, _, err := websocket.DefaultDialer.Dial(url.String(), nil)
 	if err != nil {
-		log.Printf("NewClient: Error: unable to dial, e: %v", err)
+		log.Error("NewClient: unable to dial", "e", err, "url", url)
 		return nil, err
 	}
 
 	signal := &signal{}
 	err = wsConn.ReadJSON(signal)
 	if err != nil {
-		log.Printf("NewClient: Error: unable to ReadJSON, e: %v\n", err)
+		log.Error("NewCleint: unable to ReadJSON", "e", err)
 		return nil, err
 	}
 
 	resp, err := respondChallenge(nodeID, privKey, signal)
 	if err != nil {
-		log.Printf("NewClient: Error: unable to respond Challenge, e: %v\n", err)
+		log.Error("NewClient: unable to respond Challenge", "e", err)
 		return nil, err
 	}
 
 	err = wsConn.WriteJSON(resp)
 	if err != nil {
-		log.Printf("NewClient: Error: unable to WriteJSON, e: %v\n", err)
+		log.Error("NewClient: unable to WriteJSON", "e", err)
 		return nil, err
 	}
 
 	err = wsConn.ReadJSON(signal)
 	if err != nil {
-		log.Printf("NewClient: Error: unable to ReadJSON from ack: e: %v\n", err)
+		log.Error("NewClient: unable to ReadJSON from ack", "e", err)
 		return nil, err
 	}
 
 	if signal.NodeID != nodeID {
-		log.Printf("NewClient: Error: invalid id\n")
+		log.Error("NewClient: invalid id", "signal", signal.NodeID, "nodeID", nodeID)
 		return nil, ErrInvalidID
 	}
 
