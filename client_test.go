@@ -1,7 +1,6 @@
-package main
+package signalserver
 
 import (
-	"log"
 	"net/http"
 	"net/url"
 	"testing"
@@ -56,13 +55,13 @@ func TestClientSendReceive(t *testing.T) {
 
 	key1, err := crypto.GenerateKey()
 	if err != nil {
-		t.Errorf("failed: %v", err)
+		t.Errorf("failed generate key1: %v", err)
 	}
 	nodeID1 := discv5.PubkeyID(&key1.PublicKey)
 
 	key2, err := crypto.GenerateKey()
 	if err != nil {
-		t.Errorf("failed: %v", err)
+		t.Errorf("failed generate key2: %v", err)
 	}
 	nodeID2 := discv5.PubkeyID(&key2.PublicKey)
 
@@ -70,20 +69,20 @@ func TestClientSendReceive(t *testing.T) {
 	var msg2 []byte
 
 	c1, err := NewClient(nodeID1, key1, url)
-	log.Printf("TestClientSendReceive: after c1: e: %v", err)
+	t.Logf("TestClientSendReceive: after c1: e: %v", err)
 	assert.NoError(t, err)
 
 	c2, err := NewClient(nodeID2, key2, url)
-	log.Printf("TestClientSendReceive: after c2: e: %v", err)
+	t.Logf("TestClientSendReceive: after c2: e: %v", err)
 	assert.NoError(t, err)
 
-	log.Printf("TestClientSendReceive: c1 to Send c2")
+	t.Logf("TestClientSendReceive: c1 to Send c2")
 	err = c1.Send(nodeID2, msg1)
-	log.Printf("TestClientSendReceive: after c1 sent c2: e: %v", err)
+	t.Logf("TestClientSendReceive: after c1 sent c2: e: %v", err)
 	assert.NoError(t, err)
 
 	msg2, err = c2.Receive()
-	log.Printf("TestClientSendReceive: after c2 receive c1: msg2: %v e: %v", msg2, err)
+	t.Logf("TestClientSendReceive: after c2 receive c1: msg2: %v e: %v", msg2, err)
 
 	assert.Equal(t, msg1, msg2)
 }
