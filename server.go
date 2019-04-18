@@ -12,9 +12,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type signal struct {
-	NodeID discv5.NodeID
-	Msg    []byte
+type challenge struct {
+	Challenge []byte `json:"C"`
 }
 
 type challengeResponse struct {
@@ -22,6 +21,10 @@ type challengeResponse struct {
 
 	Signature []byte
 	Hash      [32]byte
+}
+
+type challengeAck struct {
+	NodeID discv5.NodeID
 }
 
 type Server struct {
@@ -55,7 +58,7 @@ looping:
 
 func (s *Server) readLoop(nc *NodeConn) error {
 	for {
-		signal := &signal{}
+		signal := &Signal{}
 		err := nc.Conn.WsConn.ReadJSON(signal)
 		if err != nil {
 			return err
@@ -68,8 +71,8 @@ func (s *Server) readLoop(nc *NodeConn) error {
 	}
 }
 
-func (s *Server) dispatch(signal *signal) error {
-	if nc, ok := s.nodeChannels.Load(signal.NodeID); ok {
+func (s *Server) dispatch(signal *Signal) error {
+	if nc, ok := s.nodeChannels.Load(signal.ToID); ok {
 		(nc.(*NodeConn)).writeChan <- signal
 	}
 	return nil
@@ -109,12 +112,12 @@ func (s *Server) verifyNode(challenge []byte, resp *challengeResponse) error {
 }
 
 func (s *Server) identifyNodeID(conn *Conn) (discv5.NodeID, error) {
-	challenge := s.generateChallenge()
+	c := s.generateChallenge()
 
-	signal := &signal{Msg: challenge}
+	tmpC := &challenge{Challenge: c}
 
 	// send challenge to conn
-	err := conn.WsConn.WriteJSON(signal)
+	err := conn.WsConn.WriteJSON(tmpC)
 	// log.Printf("server.identifyNodeID: after WriteJSON signal: %v, e: %v", signal, err)
 	if err != nil {
 		return discv5.NodeID{}, err
@@ -126,7 +129,7 @@ func (s *Server) identifyNodeID(conn *Conn) (discv5.NodeID, error) {
 		return discv5.NodeID{}, err
 	}
 
-	err = s.verifyNode(challenge, resp)
+	err = s.verifyNode(c, resp)
 	if err != nil {
 		return discv5.NodeID{}, err
 	}
@@ -176,8 +179,8 @@ func (s *Server) SignalHandler(w http.ResponseWriter, r *http.Request) {
 		s.removeFromNodeChannels(nodeConn)
 	}()
 
-	signal := &signal{NodeID: nodeID}
-	nodeConn.Conn.WsConn.WriteJSON(signal)
+	cack := &challengeAck{NodeID: nodeID}
+	nodeConn.Conn.WsConn.WriteJSON(cack)
 
 	// write loop
 	go s.writeLoop(nodeConn)

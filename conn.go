@@ -26,12 +26,12 @@ type NodeConn struct {
 
 	Conn *Conn
 
-	writeChan chan *signal
+	writeChan chan *Signal
 	quitChan  chan struct{}
 }
 
 func NewNodeConn(nodeID discv5.NodeID, conn *Conn) *NodeConn {
-	w := make(chan *signal)
+	w := make(chan *Signal)
 	q := make(chan struct{})
 
 	nc := &NodeConn{

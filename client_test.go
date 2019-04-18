@@ -65,9 +65,6 @@ func TestClientSendReceive(t *testing.T) {
 	}
 	nodeID2 := discv5.PubkeyID(&key2.PublicKey)
 
-	msg1 := []byte("test")
-	var msg2 []byte
-
 	c1, err := NewClient(nodeID1, key1, url)
 	t.Logf("TestClientSendReceive: after c1: e: %v", err)
 	assert.NoError(t, err)
@@ -77,12 +74,14 @@ func TestClientSendReceive(t *testing.T) {
 	assert.NoError(t, err)
 
 	t.Logf("TestClientSendReceive: c1 to Send c2")
-	err = c1.Send(nodeID2, msg1)
+	msg1 := []byte("test")
+	err = c1.Send(nodeID2, msg1, nil)
 	t.Logf("TestClientSendReceive: after c1 sent c2: e: %v", err)
 	assert.NoError(t, err)
 
-	msg2, err = c2.Receive()
-	t.Logf("TestClientSendReceive: after c2 receive c1: msg2: %v e: %v", msg2, err)
+	sig2, err := c2.Receive()
+	t.Logf("TestClientSendReceive: after c2 receive c1: sig2: %v e: %v", sig2, err)
 
-	assert.Equal(t, msg1, msg2)
+	assert.Equal(t, msg1, sig2.Msg)
+
 }
