@@ -18,8 +18,8 @@ type Client struct {
 /*
 Send sends the normal-msg to toID.
 */
-func (c *Client) Send(toID discv5.NodeID, msg []byte) error {
-	signal := &signal{NodeID: toID, Msg: msg}
+func (c *Client) Send(toID discv5.NodeID, msg []byte, extra []byte) error {
+	signal := &Signal{FromID: c.nodeID, ToID: toID, Msg: msg, Extra: extra}
 
 	err := c.Conn.WsConn.WriteJSON(signal)
 	if err != nil {
@@ -32,18 +32,18 @@ func (c *Client) Send(toID discv5.NodeID, msg []byte) error {
 /*
 Receive receives the normal-msg from signal-server.
 */
-func (c *Client) Receive() ([]byte, error) {
-	signal := &signal{}
+func (c *Client) Receive() (*Signal, error) {
+	signal := &Signal{}
 	err := c.Conn.WsConn.ReadJSON(signal)
 	if err != nil {
 		return nil, err
 	}
 
-	if c.nodeID != signal.NodeID {
+	if c.nodeID != signal.ToID {
 		return nil, ErrInvalidID
 	}
 
-	return signal.Msg, nil
+	return signal, nil
 }
 
 /*
@@ -56,14 +56,14 @@ func NewClient(nodeID discv5.NodeID, privKey *ecdsa.PrivateKey, url url.URL) (*C
 		return nil, err
 	}
 
-	signal := &signal{}
-	err = wsConn.ReadJSON(signal)
+	c := &challenge{}
+	err = wsConn.ReadJSON(c)
 	if err != nil {
 		log.Error("NewCleint: unable to ReadJSON", "e", err)
 		return nil, err
 	}
 
-	resp, err := respondChallenge(nodeID, privKey, signal)
+	resp, err := respondChallenge(nodeID, privKey, c)
 	if err != nil {
 		log.Error("NewClient: unable to respond Challenge", "e", err)
 		return nil, err
@@ -75,26 +75,26 @@ func NewClient(nodeID discv5.NodeID, privKey *ecdsa.PrivateKey, url url.URL) (*C
 		return nil, err
 	}
 
-	err = wsConn.ReadJSON(signal)
+	cack := &challengeAck{}
+	err = wsConn.ReadJSON(cack)
 	if err != nil {
 		log.Error("NewClient: unable to ReadJSON from ack", "e", err)
 		return nil, err
 	}
 
-	if signal.NodeID != nodeID {
-		log.Error("NewClient: invalid id", "signal", signal.NodeID, "nodeID", nodeID)
+	if cack.NodeID != nodeID {
+		log.Error("NewClient: invalid id", "cack", cack.NodeID, "nodeID", nodeID)
 		return nil, ErrInvalidID
 	}
 
-	c := &Conn{isClosed: 0, WsConn: wsConn}
+	conn := &Conn{isClosed: 0, WsConn: wsConn}
 
-	return &Client{nodeID, c}, nil
+	return &Client{nodeID: nodeID, Conn: conn}, nil
 }
 
-func respondChallenge(nodeID discv5.NodeID, privKey *ecdsa.PrivateKey, signal *signal) (*challengeResponse, error) {
+func respondChallenge(nodeID discv5.NodeID, privKey *ecdsa.PrivateKey, c *challenge) (*challengeResponse, error) {
 
-	challenge := signal.Msg
-	hash := crypto.Keccak256Hash(challenge)
+	hash := crypto.Keccak256Hash(c.Challenge)
 
 	sig, err := crypto.Sign(hash[:], privKey)
 	if err != nil {
