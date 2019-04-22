@@ -5,9 +5,9 @@ import (
 	"net/url"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/gorilla/websocket"
+	"github.com/pkg/errors"
 )
 
 type Client struct {
@@ -40,7 +40,7 @@ func (c *Client) Receive() (*Signal, error) {
 	}
 
 	if c.nodeID != signal.ToID {
-		return nil, ErrInvalidID
+		return nil, ErrInvalidNodeID
 	}
 
 	return signal, nil
@@ -52,39 +52,33 @@ NewClient init a new client and pass the challenge from the signal-server.
 func NewClient(nodeID discv5.NodeID, privKey *ecdsa.PrivateKey, url url.URL) (*Client, error) {
 	wsConn, _, err := websocket.DefaultDialer.Dial(url.String(), nil)
 	if err != nil {
-		log.Error("NewClient: unable to dial", "e", err, "url", url)
-		return nil, err
+		return nil, errors.Wrap(err, "Dial failed")
 	}
 
 	c := &challenge{}
 	err = wsConn.ReadJSON(c)
 	if err != nil {
-		log.Error("NewCleint: unable to ReadJSON", "e", err)
-		return nil, err
+		return nil, errors.Wrap(err, "unable to parse challenge")
 	}
 
 	resp, err := respondChallenge(nodeID, privKey, c)
 	if err != nil {
-		log.Error("NewClient: unable to respond Challenge", "e", err)
-		return nil, err
+		return nil, errors.Wrap(err, "failed to respond challenge")
 	}
 
 	err = wsConn.WriteJSON(resp)
 	if err != nil {
-		log.Error("NewClient: unable to WriteJSON", "e", err)
-		return nil, err
+		return nil, errors.Wrap(err, "failed to write challenge response")
 	}
 
 	cack := &challengeAck{}
 	err = wsConn.ReadJSON(cack)
 	if err != nil {
-		log.Error("NewClient: unable to ReadJSON from ack", "e", err)
-		return nil, err
+		return nil, errors.Wrap(err, "unable to read ack")
 	}
 
 	if cack.NodeID != nodeID {
-		log.Error("NewClient: invalid id", "cack", cack.NodeID, "nodeID", nodeID)
-		return nil, ErrInvalidID
+		return nil, ErrInvalidNodeID
 	}
 
 	conn := &Conn{isClosed: 0, WsConn: wsConn}
