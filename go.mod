@@ -10,7 +10,6 @@ require (
 	github.com/gorilla/websocket v1.4.0
 	github.com/huin/goupnp v1.0.0 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.1 // indirect
-	github.com/mattn/go-colorable v0.1.1
 	github.com/pkg/errors v0.8.1
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.0 // indirect
