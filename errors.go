@@ -1,7 +1,7 @@
 package signalserver
 
-import "errors"
+import "github.com/pkg/errors"
 
 var (
-	ErrInvalidID = errors.New("invalid id")
+	ErrInvalidNodeID = errors.New("invalid node ID")
 )
